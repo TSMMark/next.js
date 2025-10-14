@@ -663,7 +663,7 @@ importers:
         version: 9.37.0(jiti@2.5.1)
       eslint-config-next:
         specifier: canary
-        version: 15.6.0-canary.32(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2)
+        version: 16.0.0-canary.4(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2)
       tailwindcss:
         specifier: 4.1.13
         version: 4.1.13
@@ -793,6 +793,18 @@ importers:
       next:
         specifier: workspace:*
         version: link:../../packages/next
+
+  bench/recursive-delete:
+    devDependencies:
+      fuzzponent:
+        specifier: workspace:*
+        version: link:../fuzzponent
+      next:
+        specifier: workspace:*
+        version: link:../../packages/next
+      rimraf:
+        specifier: 6.0.1
+        version: 6.0.1
 
   bench/rendering:
     dependencies:
@@ -4333,8 +4345,8 @@ packages:
   '@next/env@15.5.3':
     resolution: {integrity: sha512-RSEDTRqyihYXygx/OJXwvVupfr9m04+0vH8vyy0HfZ7keRto6VX9BbEk0J2PUk0VGy6YhklJUSrgForov5F9pw==}
 
-  '@next/eslint-plugin-next@15.6.0-canary.32':
-    resolution: {integrity: sha512-CCjoXb3dNT1Pq+GkcQOGncBlm6HCorbqiJ4nuhF/wKo505FXIf8vnpaUId54iN/WqwaC1Zf5wBk1shSXMuMKHA==}
+  '@next/eslint-plugin-next@16.0.0-canary.4':
+    resolution: {integrity: sha512-SOjzRNjH3VOoT76BUijKZYtE8syYqeJrvfZHLyNwBJ/P062lsozZRRGP/saZvJ9PKFsRa+DHi2GbJaCJWtrd7Q==}
 
   '@next/rspack-binding-android-arm-eabi@1.0.0':
     resolution: {integrity: sha512-goiM4M2ZlT82qtR8e7X3fwYGBBJ4DdaIkMGLa1rgSclyNXvb5mOhiSug+FgzrLsYl0O0UAO7GCMuyiF2hD5nmA==}
@@ -9267,8 +9279,8 @@ packages:
     engines: {node: '>=6.0'}
     hasBin: true
 
-  eslint-config-next@15.6.0-canary.32:
-    resolution: {integrity: sha512-rDKclf6wFaplSqVr4uI223lKLBioD+1zrYM66sIMezN4BbiMbUSwJyvGabMYOO1X600svIddP8ODnC1nxhHgqg==}
+  eslint-config-next@16.0.0-canary.4:
+    resolution: {integrity: sha512-lX16Q8gMFh8Hh6PN1BZWwbQfowYtghki/DUykDM6HRbAJv43HuDztIeDFeX3yE86SSjZmbwnBVkwujTRjuVb7w==}
     peerDependencies:
       eslint: ^7.23.0 || ^8.0.0 || ^9.0.0
       typescript: '>=3.3.1'
@@ -9380,12 +9392,6 @@ packages:
   eslint-plugin-react-hooks@0.0.0-experimental-56e84692-20251014:
     resolution: {integrity: sha512-xtYPd3QVHX+9CQaHzBS50B/GFy+lYa/4jVTZ5dw5sXjdcK1m6+dotsT+dq0YfVuqSxq1K0sB6zHg58yKdgBCBA==}
     engines: {node: '>=18'}
-    peerDependencies:
-      eslint: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0
-
-  eslint-plugin-react-hooks@5.2.0:
-    resolution: {integrity: sha512-+f15FfK64YQwZdJNELETdn5ibXEUQmW1DZL6KXhNnc2heoy/sg9VJJeT7n8TlMWouzWqSWavFkIhHyIbIAEapg==}
-    engines: {node: '>=10'}
     peerDependencies:
       eslint: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0
 
@@ -12347,10 +12353,6 @@ packages:
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
-
-  lru-cache@11.1.0:
-    resolution: {integrity: sha512-QIXZUBJUx+2zHUdQujWejBkcD9+cs94tLn0+YL8UrCh+D5sCXZ4c7LaEH48pNwRY3MLDgqUFyhlCyjJPf1WP0A==}
-    engines: {node: 20 || >=22}
 
   lru-cache@11.2.1:
     resolution: {integrity: sha512-r8LA6i4LP4EeWOhqBaZZjDWwehd1xUJPCJd9Sv300H0ZmcUER4+JPh7bqqZeqs1o5pgtgvXm+d9UGrB5zZGDiQ==}
@@ -21275,7 +21277,7 @@ snapshots:
 
   '@next/env@15.5.3': {}
 
-  '@next/eslint-plugin-next@15.6.0-canary.32':
+  '@next/eslint-plugin-next@16.0.0-canary.4':
     dependencies:
       fast-glob: 3.3.1
 
@@ -27103,9 +27105,9 @@ snapshots:
     optionalDependencies:
       source-map: 0.6.1
 
-  eslint-config-next@15.6.0-canary.32(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2):
+  eslint-config-next@16.0.0-canary.4(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2):
     dependencies:
-      '@next/eslint-plugin-next': 15.6.0-canary.32
+      '@next/eslint-plugin-next': 16.0.0-canary.4
       '@rushstack/eslint-patch': 1.10.4
       '@typescript-eslint/eslint-plugin': 8.46.0(@typescript-eslint/parser@8.46.0(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2))(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2)
       '@typescript-eslint/parser': 8.46.0(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2)
@@ -27115,7 +27117,7 @@ snapshots:
       eslint-plugin-import: 2.31.0(@typescript-eslint/parser@8.46.0(eslint@9.37.0(jiti@2.5.1))(typescript@5.9.2))(eslint@9.37.0(jiti@2.5.1))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.37.0(jiti@2.5.1))
       eslint-plugin-react: 7.37.5(eslint@9.37.0(jiti@2.5.1))
-      eslint-plugin-react-hooks: 5.2.0(eslint@9.37.0(jiti@2.5.1))
+      eslint-plugin-react-hooks: 7.0.0(eslint@9.37.0(jiti@2.5.1))
     optionalDependencies:
       typescript: 5.9.2
     transitivePeerDependencies:
@@ -27363,10 +27365,6 @@ snapshots:
       zod-validation-error: 3.4.0(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
-
-  eslint-plugin-react-hooks@5.2.0(eslint@9.37.0(jiti@2.5.1)):
-    dependencies:
-      eslint: 9.37.0(jiti@2.5.1)
 
   eslint-plugin-react-hooks@7.0.0(eslint@9.37.0(jiti@2.5.1)):
     dependencies:
@@ -31202,8 +31200,6 @@ snapshots:
 
   lru-cache@10.4.3: {}
 
-  lru-cache@11.1.0: {}
-
   lru-cache@11.2.1: {}
 
   lru-cache@4.1.5:
@@ -33472,7 +33468,7 @@ snapshots:
 
   path-scurry@2.0.0:
     dependencies:
-      lru-cache: 11.1.0
+      lru-cache: 11.2.1
       minipass: 7.1.2
 
   path-to-regexp@0.1.12: {}
