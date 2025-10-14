@@ -14,6 +14,11 @@ import type { MiddlewareMatcher } from '../analysis/get-page-static-info'
 import { normalizeAppPath } from '../../shared/lib/router/utils/app-paths'
 import { AdapterOutputType, type PHASE_TYPE } from '../../shared/lib/constants'
 import { normalizePagePath } from '../../shared/lib/page-path/normalize-page-path'
+import {
+  convertRedirects,
+  convertRewrites,
+  convertHeaders,
+} from 'next/dist/compiled/@vercel/routing-utils'
 
 import type {
   MiddlewareManifest,
@@ -21,12 +26,9 @@ import type {
 } from '../webpack/plugins/middleware-plugin'
 
 import type {
-  ManifestRoute,
   RoutesManifest,
   PrerenderManifest,
-  ManifestHeaderRoute,
   ManifestRewriteRoute,
-  ManifestRedirectRoute,
   FunctionsConfigManifest,
 } from '..'
 
@@ -37,6 +39,9 @@ import {
 } from '../../lib/constants'
 import { normalizeLocalePath } from '../../shared/lib/i18n/normalize-locale-path'
 import { addPathPrefix } from '../../shared/lib/router/utils/add-path-prefix'
+import { getRedirectStatus } from '../../lib/redirect-status'
+import { getNamedRouteRegex } from '../../shared/lib/router/utils/route-regex'
+import { escapeStringRegexp } from '../../shared/lib/escape-regexp'
 
 interface SharedRouteFields {
   /**
@@ -261,6 +266,20 @@ export interface AdapterOutputs {
   staticFiles: Array<AdapterOutput['STATIC_FILE']>
 }
 
+type RewriteItem = {
+  source: string
+  sourceRegex: string
+  destination: string
+  has: RouteHas[] | undefined
+  missing: RouteHas[] | undefined
+}
+
+type DynamicRouteItem = {
+  source: string
+  sourceRegex: string
+  destination: string
+}
+
 export interface NextAdapter {
   name: string
   /**
@@ -278,14 +297,29 @@ export interface NextAdapter {
   ) => Promise<NextConfigComplete> | NextConfigComplete
   onBuildComplete?: (ctx: {
     routes: {
-      headers: Array<ManifestHeaderRoute>
-      redirects: Array<ManifestRedirectRoute>
+      headers: Array<{
+        source: string
+        sourceRegex: string
+        headers: Record<string, string>
+        has: RouteHas[] | undefined
+        missing: RouteHas[] | undefined
+        priority?: boolean
+      }>
+      redirects: Array<{
+        source: string
+        sourceRegex: string
+        destination: string
+        statusCode: number
+        has: RouteHas[] | undefined
+        missing: RouteHas[] | undefined
+        priority?: boolean
+      }>
       rewrites: {
-        beforeFiles: Array<ManifestRewriteRoute>
-        afterFiles: Array<ManifestRewriteRoute>
-        fallback: Array<ManifestRewriteRoute>
+        beforeFiles: RewriteItem[]
+        afterFiles: RewriteItem[]
+        fallback: RewriteItem[]
       }
-      dynamicRoutes: ReadonlyArray<ManifestRoute>
+      dynamicRoutes: Array<DynamicRouteItem>
     }
     outputs: AdapterOutputs
     /**
@@ -308,6 +342,11 @@ export interface NextAdapter {
      * nextVersion is the current version of Next.js being used
      */
     nextVersion: string
+    /**
+     * buildId is the current unique ID for the build, this can be
+     * influenced by NextConfig.generateBuildId
+     */
+    buildId: string
   }) => Promise<void> | void
 }
 
@@ -334,6 +373,7 @@ function normalizePathnames(
 export async function handleBuildComplete({
   dir,
   config,
+  buildId,
   configOutDir,
   distDir,
   pageKeys,
@@ -353,6 +393,7 @@ export async function handleBuildComplete({
 }: {
   dir: string
   distDir: string
+  buildId: string
   configOutDir: string
   adapterPath: string
   tracingRoot: string
@@ -1054,18 +1095,149 @@ export async function handleBuildComplete({
 
     normalizePathnames(config, outputs)
 
+    const dynamicRoutes: DynamicRouteItem[] = []
+    const dynamicDataRoutes: DynamicRouteItem[] = []
+    const dynamicSegmentRoutes: DynamicRouteItem[] = []
+
+    const getDestinationQuery = (routeKeys: Record<string, string>) => {
+      const items = Object.entries(routeKeys ?? {})
+      if (items.length === 0) return ''
+
+      return '?' + items.map(([key, value]) => `${value}=$${key}`).join('&')
+    }
+
+    for (const route of routesManifest.dynamicRoutes) {
+      const shouldLocalize = pageKeys.includes(route.page) && config.i18n
+
+      const routeRegex = getNamedRouteRegex(route.page, {
+        prefixRouteKeys: true,
+      })
+      // needs basePath and locale handling if pages router
+      dynamicRoutes.push({
+        source: route.page,
+        sourceRegex:
+          '^' +
+          path.posix.join(
+            config.basePath,
+            shouldLocalize ? '/(?<nextLocale>.*?)' : '',
+            routeRegex.namedRegex.substring(1)
+          ),
+        destination:
+          path.posix.join(
+            config.basePath,
+            shouldLocalize ? '$nextLocale' : '',
+            route.page
+          ) + getDestinationQuery(route.routeKeys),
+      })
+
+      for (const segmentRoute of route.prefetchSegmentDataRoutes || []) {
+        dynamicSegmentRoutes.push({
+          source: route.page,
+          sourceRegex:
+            '^' +
+            path.posix.join(config.basePath, segmentRoute.source.substring(1)),
+          destination: path.posix.join(
+            config.basePath,
+            segmentRoute.destination +
+              getDestinationQuery(segmentRoute.routeKeys)
+          ),
+        })
+      }
+    }
+
+    const needsMiddlewareResolveRoutes =
+      outputs.middleware && outputs.pages.length > 0
+
+    for (const route of routesManifest.dataRoutes) {
+      if (needsMiddlewareResolveRoutes || isDynamicRoute(route.page)) {
+        const shouldLocalize = pageKeys.includes(route.page) && config.i18n
+
+        const routeRegex = getNamedRouteRegex(route.page + '.json', {
+          prefixRouteKeys: true,
+        })
+        const destination = path.posix.join(
+          config.basePath,
+          `_next/data`,
+          buildId,
+          shouldLocalize ? '$nextLocale' : '',
+          route.page + '.json' + getDestinationQuery(route.routeKeys || {})
+        )
+
+        dynamicDataRoutes.push({
+          source: route.page,
+          sourceRegex:
+            '^' +
+            path.posix.join(
+              config.basePath,
+              `_next/data`,
+              escapeStringRegexp(buildId),
+              shouldLocalize ? '/(?<nextLocale>.*)' : '',
+              routeRegex.namedRegex.substring(1)
+            ),
+          destination,
+        })
+      }
+    }
+
+    const buildRewriteItem = (route: ManifestRewriteRoute): RewriteItem => {
+      const converted = convertRewrites([route], ['nextInternalLocale'])[0]
+
+      return {
+        source: route.source,
+        sourceRegex: converted.src || route.regex,
+        destination: converted.dest || route.destination,
+        has: route.has,
+        missing: route.missing,
+      }
+    }
+
     try {
       await adapterMod.onBuildComplete({
         routes: {
-          dynamicRoutes: routesManifest.dynamicRoutes,
-          rewrites: routesManifest.rewrites,
-          redirects: routesManifest.redirects,
-          headers: routesManifest.headers,
+          dynamicRoutes: [
+            ...dynamicDataRoutes,
+            ...dynamicSegmentRoutes,
+            ...dynamicRoutes,
+          ],
+          rewrites: {
+            beforeFiles:
+              routesManifest.rewrites.beforeFiles.map(buildRewriteItem),
+            afterFiles:
+              routesManifest.rewrites.afterFiles.map(buildRewriteItem),
+            fallback: routesManifest.rewrites.fallback.map(buildRewriteItem),
+          },
+          redirects: routesManifest.redirects.map((route) => {
+            const converted = convertRedirects([route], 307)[0]
+            let dest = 'headers' in converted && converted.headers?.Location
+
+            return {
+              source: route.source,
+              sourceRegex: converted.src || route.regex,
+              destination: dest || route.destination,
+              statusCode: converted.status || getRedirectStatus(route),
+              has: route.has,
+              missing: route.missing,
+              priority: route.internal || undefined,
+            }
+          }),
+          headers: routesManifest.headers.map((route) => {
+            const converted = convertHeaders([route])[0]
+
+            return {
+              source: route.source,
+              sourceRegex: converted.src || route.regex,
+              headers: 'headers' in converted ? converted.headers || {} : {},
+              has: route.has,
+              missing: route.missing,
+              priority: route.internal || undefined,
+            }
+          }),
         },
         outputs,
 
         config,
         distDir,
+        buildId,
         nextVersion,
         projectDir: dir,
         repoRoot: tracingRoot,

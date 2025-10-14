@@ -3135,7 +3135,7 @@ export default async function build(
               ...(isRoutePPREnabled
                 ? [
                     {
-                      type: 'header',
+                      type: 'header' as const,
                       key: 'user-agent',
                       value: htmlBotsRegexString,
                     },
@@ -4131,6 +4131,7 @@ export default async function build(
               dir,
               distDir,
               config,
+              buildId,
               configOutDir: path.join(dir, configOutDir),
               staticPages,
               nextVersion: process.env.__NEXT_VERSION as string,

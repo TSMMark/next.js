@@ -93,6 +93,24 @@ export async function ncc_node_html_parser(task, opts) {
 }
 
 // eslint-disable-next-line camelcase
+externals['@vercel/routing-utils'] = 'next/dist/compiled/@vercel/routing-utils'
+export async function ncc_vercel_routing_utils(task, opts) {
+  await task
+    .source(
+      relative(
+        __dirname,
+        require.resolve('@vercel/routing-utils/dist/superstatic')
+      )
+    )
+    .ncc({
+      packageName: '@vercel/routing-utils',
+      externals,
+      target: 'es5',
+    })
+    .target('src/compiled/@vercel/routing-utils')
+}
+
+// eslint-disable-next-line camelcase
 externals['busboy'] = 'next/dist/compiled/busboy'
 export async function ncc_busboy(task, opts) {
   await task
@@ -2435,6 +2453,7 @@ export async function ncc(task, opts) {
       'ncc_mswjs_interceptors',
       'ncc_rsc_poison_packages',
       'ncc_modelcontextprotocol_sdk',
+      'ncc_vercel_routing_utils',
     ],
     opts
   )
