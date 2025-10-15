@@ -3,7 +3,7 @@
  */
 const nextConfig = {
   experimental: {
-    routerBFCache: true,
+    cacheComponents: true,
   },
 }
 

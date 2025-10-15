@@ -687,7 +687,7 @@ export default function OuterLayoutRouter({
       )
     }
 
-    if (process.env.__NEXT_ROUTER_BF_CACHE) {
+    if (process.env.__NEXT_CACHE_COMPONENTS) {
       child = (
         <Activity
           key={stateKey}

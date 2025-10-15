@@ -852,8 +852,6 @@ pub struct ExperimentalConfig {
     /// directory.
     ppr: Option<ExperimentalPartialPrerendering>,
     taint: Option<bool>,
-    #[serde(rename = "routerBFCache")]
-    router_bfcache: Option<bool>,
     proxy_timeout: Option<f64>,
     /// enables the minification of server code.
     server_minification: Option<bool>,
