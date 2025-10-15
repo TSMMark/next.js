@@ -52,7 +52,11 @@ export class StagedRenderingController {
     }
   }
 
-  delayUntilStage<T>(stage: NonStaticRenderStage, resolvedValue: T) {
+  delayUntilStage<T>(
+    stage: NonStaticRenderStage,
+    displayName: string | undefined,
+    resolvedValue: T
+  ) {
     let stagePromise: Promise<void>
     switch (stage) {
       case RenderStage.Runtime: {
@@ -69,13 +73,11 @@ export class StagedRenderingController {
       }
     }
 
-    // FIXME: this seems to be the only form that leads to correct API names
-    // being displayed in React Devtools (in the "suspended by" section).
-    // If we use `promise.then(() => resolvedValue)`, the names are lost.
-    // It's a bit strange that only one of those works right.
-    const promise = new Promise<T>((resolve, reject) => {
-      stagePromise.then(resolve.bind(null, resolvedValue), reject)
-    })
+    const promise = createDevtoolsIOPromise(
+      stagePromise,
+      displayName,
+      resolvedValue
+    )
 
     // Analogously to `makeHangingPromise`, we might reject this promise if the signal is invoked.
     // (e.g. in the case where we don't want want the render to proceed to the dynamic stage and abort it).
@@ -85,6 +87,26 @@ export class StagedRenderingController {
     }
     return promise
   }
+}
+
+function createDevtoolsIOPromise<T>(
+  trigger: Promise<any>,
+  displayName: string | undefined,
+  resolvedValue: T
+): Promise<T> {
+  // If we create a `new Promise` and give it a displayName
+  // (with no userspace code above us in the stack)
+  // ReactDevtools will use it as the IO cause when determining "suspended by".
+  // In particular, it should shadow any inner IO that resolved/rejected the promise
+  // (which in this case will be the `setTimeout` that triggers the relevant stage)
+  const promise = new Promise<T>((resolve, reject) => {
+    trigger.then(resolve.bind(null, resolvedValue), reject)
+  })
+  if (displayName !== undefined) {
+    // @ts-expect-error
+    promise.displayName = displayName
+  }
+  return promise
 }
 
 function ignoreReject() {}

@@ -2797,6 +2797,12 @@ async function renderWithRestartOnCacheMissInDev(
     stagedRendering: initialStageController,
     prerenderResumeDataCache,
     cacheSignal,
+    asyncApiPromises: createAsyncApiPromisesInDev(
+      initialStageController,
+      requestStore.cookies,
+      requestStore.mutableCookies,
+      requestStore.headers
+    ),
     dynamicTracking: createDynamicTrackingState(
       false // isDebugDynamicAccesses
     ),
@@ -2910,6 +2916,12 @@ async function renderWithRestartOnCacheMissInDev(
     stagedRendering: finalStageController,
     prerenderResumeDataCache: null,
     cacheSignal: null,
+    asyncApiPromises: createAsyncApiPromisesInDev(
+      initialStageController,
+      requestStore.cookies,
+      requestStore.mutableCookies,
+      requestStore.headers
+    ),
     dynamicTracking: createDynamicTrackingState(
       false // isDebugDynamicAccesses
     ),
@@ -2957,6 +2969,48 @@ async function renderWithRestartOnCacheMissInDev(
     stream: finalServerStream,
     debugChannel,
     requestStore,
+  }
+}
+
+function createAsyncApiPromisesInDev(
+  stagedRendering: StagedRenderingController,
+  cookies: RequestStore['cookies'],
+  mutableCookies: RequestStore['mutableCookies'],
+  headers: RequestStore['headers']
+): DevRequestStoreModern['asyncApiPromises'] {
+  return {
+    // Runtime APIs
+    cookies: stagedRendering.delayUntilStage(
+      RenderStage.Runtime,
+      'cookies',
+      cookies
+    ),
+    mutableCookies: stagedRendering.delayUntilStage(
+      RenderStage.Runtime,
+      'cookies',
+      mutableCookies as RequestStore['cookies']
+    ),
+    headers: stagedRendering.delayUntilStage(
+      RenderStage.Runtime,
+      'headers',
+      headers
+    ),
+    // These are not used directly, but we chain other `params`/`searchParams` promises off of them.
+    sharedParamsParent: stagedRendering.delayUntilStage(
+      RenderStage.Runtime,
+      'params',
+      '<internal params>'
+    ),
+    sharedSearchParamsParent: stagedRendering.delayUntilStage(
+      RenderStage.Runtime,
+      'searchParams',
+      '<internal searchParams>'
+    ),
+    connection: stagedRendering.delayUntilStage(
+      RenderStage.Dynamic,
+      'connection',
+      undefined
+    ),
   }
 }
 

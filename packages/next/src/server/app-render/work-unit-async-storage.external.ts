@@ -85,6 +85,7 @@ export type CommonDevStoreModern = {
   readonly stagedRendering: StagedRenderingController
   readonly captureOwnerStack: () => string | null
   readonly dynamicTracking: DynamicTrackingState
+  readonly asyncApiPromises: DevAsyncApiPromises
 } & (
   | {
       // In the initial render, we track and fill caches
@@ -100,6 +101,17 @@ export type CommonDevStoreModern = {
 
 type NoneOf<TObj extends Record<string, any>> = {
   [key in keyof TObj]?: undefined
+}
+
+type DevAsyncApiPromises = {
+  cookies: Promise<ReadonlyRequestCookies>
+  mutableCookies: Promise<ReadonlyRequestCookies>
+  headers: Promise<ReadonlyHeaders>
+
+  sharedParamsParent: Promise<string>
+  sharedSearchParamsParent: Promise<string>
+
+  connection: Promise<undefined>
 }
 
 /**
