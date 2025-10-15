@@ -29,7 +29,7 @@ export interface CommonWorkUnitStore {
   readonly implicitTags: ImplicitTags
 }
 
-export interface RequestStore extends CommonWorkUnitStore {
+interface BaseRequestStore extends CommonWorkUnitStore {
   readonly type: 'request'
 
   /**
@@ -65,13 +65,41 @@ export interface RequestStore extends CommonWorkUnitStore {
    * The resume data cache for this request. This will be a immutable cache.
    */
   renderResumeDataCache: RenderResumeDataCache | null
+}
 
-  // DEV-only
+export type RequestStore = ProdRequestStore | DevRequestStore
+export type ProdRequestStore = BaseRequestStore & NoneOf<DevStore>
+export type DevRequestStore = BaseRequestStore & DevStore
+export type DevRequestStoreModern = BaseRequestStore & DevStoreModern
+
+type DevStore = DevStoreLegacy | DevStoreModern
+type DevStoreLegacy = CommonDevStore & NoneOf<CommonDevStoreModern>
+type DevStoreModern = CommonDevStore & CommonDevStoreModern
+
+type CommonDevStore = {
   usedDynamic?: boolean
-  devFallbackParams?: OpaqueFallbackRouteParams | null
-  stagedRendering?: StagedRenderingController | null
-  cacheSignal?: CacheSignal | null
-  prerenderResumeDataCache?: PrerenderResumeDataCache | null
+  devFallbackParams: OpaqueFallbackRouteParams | null
+}
+
+export type CommonDevStoreModern = {
+  readonly stagedRendering: StagedRenderingController
+  readonly captureOwnerStack: () => string | null
+  readonly dynamicTracking: DynamicTrackingState
+} & (
+  | {
+      // In the initial render, we track and fill caches
+      readonly cacheSignal: CacheSignal
+      readonly prerenderResumeDataCache: PrerenderResumeDataCache
+    }
+  | {
+      // In the final (restarted) render, we do not track or fill caches
+      readonly cacheSignal: null
+      readonly prerenderResumeDataCache: null
+    }
+)
+
+type NoneOf<TObj extends Record<string, any>> = {
+  [key in keyof TObj]?: undefined
 }
 
 /**
