@@ -301,6 +301,16 @@ pub enum TaskPersistence {
     Local,
 }
 
+impl Display for TaskPersistence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskPersistence::Persistent => write!(f, "persistent"),
+            TaskPersistence::Transient => write!(f, "transient"),
+            TaskPersistence::Local => write!(f, "local"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReadConsistency {
     /// The default behavior for most APIs. Reads are faster, but may return stale values, which
