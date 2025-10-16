@@ -40,6 +40,22 @@ const nextConfig = {
 module.exports = nextConfig
 ```
 
+## Target React Version
+
+You can configure the compiler to target React version 18 if you haven't upgraded to React 19 yet.
+
+```ts filename="next.config.ts" switcher
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  reactCompiler: {
+    target: '19',
+  },
+}
+
+export default nextConfig
+```
+
 ## Annotations
 
 You can configure the compiler to run in "opt-in" mode as follows:
