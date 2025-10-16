@@ -703,7 +703,13 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                 && let Some(reader) = reader
                 && (!task.is_immutable() || cfg!(feature = "verify_immutable"))
             {
-                let reader = reader.unwrap();
+                #[cfg(feature = "trace_task_output_dependencies")]
+                let _span = tracing::trace_span!(
+                    "add output dependency",
+                    task = %task_id,
+                    dependent_task = %reader
+                )
+                .entered();
                 let _ = task.add(CachedDataItem::OutputDependent {
                     task: reader,
                     value: (),
