@@ -500,6 +500,7 @@ export async function handler(
           subresourceIntegrityManifest,
           serverActionsManifest,
           clientReferenceManifest,
+          setCacheStatus: routerServerContext?.setCacheStatus,
           setIsrStatus: routerServerContext?.setIsrStatus,
           setReactDebugChannel: routerServerContext?.setReactDebugChannel,
 
