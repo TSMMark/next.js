@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     future::Future,
     hash::BuildHasherDefault,
     mem::take,
