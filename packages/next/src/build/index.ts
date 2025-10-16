@@ -4146,6 +4146,7 @@ export default async function build(
               middlewareManifest,
               functionsConfigManifest,
               hasStatic404: useStaticPages404,
+              hasStatic500: useDefaultStatic500,
               requiredServerFiles: requiredServerFilesManifest.files,
             })
           })

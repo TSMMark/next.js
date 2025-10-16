@@ -278,6 +278,8 @@ type DynamicRouteItem = {
   source: string
   sourceRegex: string
   destination: string
+  has: RouteHas[] | undefined
+  missing: RouteHas[] | undefined
 }
 
 export interface NextAdapter {
@@ -383,6 +385,7 @@ export async function handleBuildComplete({
   staticPages,
   nextVersion,
   hasStatic404,
+  hasStatic500,
   routesManifest,
   hasNodeMiddleware,
   prerenderManifest,
@@ -399,6 +402,7 @@ export async function handleBuildComplete({
   tracingRoot: string
   nextVersion: string
   hasStatic404: boolean
+  hasStatic500: boolean
   staticPages: Set<string>
   hasNodeMiddleware: boolean
   config: NextConfigComplete
@@ -881,6 +885,20 @@ export async function handleBuildComplete({
         return meta
       }
 
+      const filePathCache = new Map<string, Promise<boolean>>()
+      const cachedFilePathCheck = async (filePath: string) => {
+        if (filePathCache.has(filePath)) {
+          return filePathCache.get(filePath)
+        }
+        const newCheck = fs
+          .access(filePath)
+          .then(() => true)
+          .catch(() => false)
+        filePathCache.set(filePath, newCheck)
+
+        return newCheck
+      }
+
       for (const route in prerenderManifest.routes) {
         const {
           initialExpireSeconds: initialExpiration,
@@ -926,7 +944,19 @@ export async function handleBuildComplete({
         // we use the static 404 for notFound: true if available
         // if not we do a blocking invoke on first request
         if (isNotFoundTrue && hasStatic404) {
-          filePath = path.join(pagesDistDir, '404.html')
+          const locale =
+            config.i18n &&
+            normalizeLocalePath(route, config.i18n?.locales).detectedLocale
+
+          for (const currentFilePath of [
+            path.join(pagesDistDir, locale || '', '404.html'),
+            path.join(pagesDistDir, '404.html'),
+          ]) {
+            if (await cachedFilePathCheck(currentFilePath)) {
+              filePath = currentFilePath
+              break
+            }
+          }
         }
 
         const meta = await getAppRouteMeta(route, isAppPage)
@@ -1075,21 +1105,105 @@ export async function handleBuildComplete({
                 }
               : undefined,
         }
-        outputs.prerenders.push(initialOutput)
 
-        if (isAppPage) {
-          await handleAppMeta(dynamicRoute, initialOutput, meta)
-        }
+        if (!config.i18n || isAppPage) {
+          outputs.prerenders.push(initialOutput)
 
-        if (dataRoute) {
-          outputs.prerenders.push({
-            ...initialOutput,
-            id: dataRoute,
-            pathname: dataRoute,
-            fallback: undefined,
-          })
+          if (isAppPage) {
+            await handleAppMeta(dynamicRoute, initialOutput, meta)
+          }
+
+          if (dataRoute) {
+            outputs.prerenders.push({
+              ...initialOutput,
+              id: dataRoute,
+              pathname: dataRoute,
+              fallback: undefined,
+            })
+          }
+          prerenderGroupId += 1
+        } else {
+          for (const locale of config.i18n.locales) {
+            const currentOutput = {
+              ...initialOutput,
+              pathname: path.posix.join(`/${locale}`, initialOutput.pathname),
+              id: path.posix.join(`/${locale}`, initialOutput.id),
+              fallback:
+                typeof fallback === 'string'
+                  ? {
+                      ...initialOutput.fallback,
+                      filePath: path.join(
+                        pagesDistDir,
+                        locale,
+                        // app router dynamic route fallbacks don't have the
+                        // extension so ensure it's added here
+                        fallback.endsWith('.html')
+                          ? fallback
+                          : `${fallback}.html`
+                      ),
+                    }
+                  : undefined,
+            }
+            outputs.prerenders.push(currentOutput)
+
+            if (dataRoute) {
+              outputs.prerenders.push({
+                ...initialOutput,
+                id: path.posix.join(
+                  `_next/data`,
+                  buildId,
+                  locale,
+                  dynamicRoute + '.json'
+                ),
+                pathname: path.posix.join(
+                  `_next/data`,
+                  buildId,
+                  locale,
+                  dynamicRoute + '.json'
+                ),
+                // data route doesn't have skeleton fallback
+                fallback: undefined,
+              })
+            }
+            prerenderGroupId += 1
+          }
         }
-        prerenderGroupId += 1
+      }
+
+      // ensure 404
+      const staticErrorDocs = [
+        ...(hasStatic404 ? ['/404'] : []),
+        ...(hasStatic500 ? ['/500'] : []),
+      ]
+
+      for (const errorDoc of staticErrorDocs) {
+        const errorDocPath = path.posix.join(
+          '/',
+          config.i18n?.defaultLocale || '',
+          errorDoc
+        )
+
+        if (!prerenderManifest.routes[errorDocPath]) {
+          for (const currentDocPath of [
+            errorDocPath,
+            ...(config.i18n?.locales?.map((locale) =>
+              path.posix.join('/', locale, errorDoc)
+            ) || []),
+          ]) {
+            const currentFilePath = path.join(
+              pagesDistDir,
+              `${currentDocPath}.html`
+            )
+            if (await cachedFilePathCheck(currentFilePath)) {
+              outputs.staticFiles.push({
+                pathname: currentDocPath,
+                id: currentDocPath,
+                type: AdapterOutputType.STATIC_FILE,
+                filePath: currentFilePath,
+              })
+            }
+          }
+        }
       }
     }
 
@@ -1106,18 +1220,35 @@ export async function handleBuildComplete({
       return '?' + items.map(([key, value]) => `${value}=$${key}`).join('&')
     }
 
+    const fallbackFalseHasCondition: RouteHas[] = [
+      {
+        type: 'cookie',
+        key: '__prerender_bypass',
+        value: prerenderManifest.preview.previewModeId,
+      },
+      {
+        type: 'cookie',
+        key: '__next_preview_data',
+      },
+    ]
+
     for (const route of routesManifest.dynamicRoutes) {
       const shouldLocalize = pageKeys.includes(route.page) && config.i18n
 
       const routeRegex = getNamedRouteRegex(route.page, {
         prefixRouteKeys: true,
       })
+
+      const isFallbackFalse =
+        prerenderManifest.dynamicRoutes[route.page]?.fallback === false
+
       // needs basePath and locale handling if pages router
       dynamicRoutes.push({
         source: route.page,
         sourceRegex:
           '^' +
           path.posix.join(
+            '/',
             config.basePath,
             shouldLocalize ? '/(?<nextLocale>.*?)' : '',
             routeRegex.namedRegex.substring(1)
@@ -1128,6 +1259,8 @@ export async function handleBuildComplete({
             shouldLocalize ? '$nextLocale' : '',
             route.page
           ) + getDestinationQuery(route.routeKeys),
+        has: isFallbackFalse ? fallbackFalseHasCondition : undefined,
+        missing: undefined,
       })
 
       for (const segmentRoute of route.prefetchSegmentDataRoutes || []) {
@@ -1135,12 +1268,18 @@ export async function handleBuildComplete({
           source: route.page,
           sourceRegex:
             '^' +
-            path.posix.join(config.basePath, segmentRoute.source.substring(1)),
+            path.posix.join(
+              '/',
+              config.basePath,
+              segmentRoute.source.substring(1)
+            ),
           destination: path.posix.join(
             config.basePath,
             segmentRoute.destination +
               getDestinationQuery(segmentRoute.routeKeys)
           ),
+          has: undefined,
+          missing: undefined,
         })
       }
     }
@@ -1151,16 +1290,26 @@ export async function handleBuildComplete({
     for (const route of routesManifest.dataRoutes) {
       if (needsMiddlewareResolveRoutes || isDynamicRoute(route.page)) {
         const shouldLocalize = pageKeys.includes(route.page) && config.i18n
+        const isFallbackFalse =
+          prerenderManifest.dynamicRoutes[route.page]?.fallback === false
 
         const routeRegex = getNamedRouteRegex(route.page + '.json', {
           prefixRouteKeys: true,
+          includeSuffix: true,
         })
         const destination = path.posix.join(
+          '/',
           config.basePath,
           `_next/data`,
           buildId,
-          shouldLocalize ? '$nextLocale' : '',
-          route.page + '.json' + getDestinationQuery(route.routeKeys || {})
+          ...(route.page === '/'
+            ? [shouldLocalize ? '$nextLocale.json' : 'index.json']
+            : [
+                shouldLocalize ? '$nextLocale' : '',
+                route.page +
+                  '.json' +
+                  getDestinationQuery(route.routeKeys || {}),
+              ])
         )
 
         dynamicDataRoutes.push({
@@ -1168,6 +1317,7 @@ export async function handleBuildComplete({
           sourceRegex:
             '^' +
             path.posix.join(
+              '/',
               config.basePath,
               `_next/data`,
               escapeStringRegexp(buildId),
@@ -1175,6 +1325,8 @@ export async function handleBuildComplete({
               routeRegex.namedRegex.substring(1)
             ),
           destination,
+          has: isFallbackFalse ? fallbackFalseHasCondition : undefined,
+          missing: undefined,
         })
       }
     }
